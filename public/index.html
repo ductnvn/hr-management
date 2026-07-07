@@ -1,0 +1,42 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quản lý Nhân sự</title>
+<link rel="stylesheet" href="/styles.css">
+
+<!-- Màn hình đăng nhập -->
+<div id="login" class="login-wrap hidden">
+  <form class="login-card" id="loginForm">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:-8px"><button type="button" class="lang-toggle" id="loginLang">EN</button></div>
+    <h1>🏭 <span data-i18n="app_title">Quản lý Nhân sự</span></h1>
+    <p data-i18n="app_sub">Hệ thống cơ sở dữ liệu nhân sự nội bộ</p>
+    <label class="field"><span data-i18n="login_pass">Mật khẩu quản trị</span>
+      <input type="password" id="loginPassword" autocomplete="current-password" required>
+    </label>
+    <button class="btn primary" type="submit" data-i18n="login_btn">Đăng nhập</button>
+    <p id="loginErr" style="color:var(--danger);margin-top:12px;text-align:center"></p>
+  </form>
+</div>
+
+<!-- Ứng dụng -->
+<div id="app" class="app hidden">
+  <aside class="sidebar">
+    <div class="brand">🏭 <span data-i18n="app_title">HR System</span><small data-i18n="company">Công ty Sản xuất</small></div>
+    <nav class="nav" id="nav">
+      <button data-view="employees" class="active"><span>👥 <span data-i18n="nav_employees">Nhân sự</span></span></button>
+      <button data-view="campaigns"><span>🔗 <span data-i18n="nav_campaigns">Cập nhật từ xa</span></span></button>
+      <button data-view="history"><span>🕘 <span data-i18n="nav_history">Lịch sử cập nhật</span></span></button>
+    </nav>
+    <div class="sidebar-foot">
+      <button id="langBtn" class="lang-btn">🌐 <span id="langLabel">English</span></button>
+      <button id="logoutBtn" data-i18n="logout">Đăng xuất</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar"><h1 id="viewTitle">Danh sách nhân sự</h1></div>
+    <div class="content" id="content"></div>
+  </main>
+</div>
+
+<div class="toast-wrap" id="toasts"></div>
+<script type="module" src="/admin.js"></script>

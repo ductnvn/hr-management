@@ -1,0 +1,20 @@
+# Blueprint deploy cho Render.com — https://render.com
+# Vào Render → New → Blueprint → trỏ tới repo này. Đĩa lưu (disk) giữ hr.db bền vững.
+services:
+  - type: web
+    name: hr-management
+    runtime: node
+    plan: free
+    buildCommand: "" # không cần build (không có dependency)
+    startCommand: node --experimental-sqlite server.js
+    envVars:
+      - key: HR_DB
+        value: /data/hr.db        # đặt DB trong đĩa lưu bền
+      - key: ADMIN_PASSWORD
+        sync: false               # nhập mật khẩu quản trị trong dashboard Render
+      - key: NODE_VERSION
+        value: "22"
+    disk:
+      name: hr-data
+      mountPath: /data            # đĩa lưu bền cho SQLite
+      sizeGB: 1

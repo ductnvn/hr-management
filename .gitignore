@@ -1,0 +1,22 @@
+# Cơ sở dữ liệu cục bộ (không đưa lên git)
+hr.db
+hr.db-wal
+hr.db-shm
+*.sqlite
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Môi trường
+.env
+.env.local
+
+# Hệ điều hành / IDE
+.DS_Store
+.vscode/
+*.log
+
+# Scratch
+scratchpad/
+.claude/settings.local.json

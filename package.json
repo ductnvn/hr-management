@@ -1,0 +1,12 @@
+{
+  "name": "hr-management",
+  "version": "1.0.0",
+  "description": "Ứng dụng quản lý cơ sở dữ liệu nhân sự nội bộ cho công ty sản xuất",
+  "type": "module",
+  "scripts": {
+    "start": "node --experimental-sqlite server.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  }
+}

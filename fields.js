@@ -11,12 +11,19 @@
 //   self     - mặc định cho phép nhân sự tự cập nhật qua link chia sẻ
 
 import { schools } from './schools.js';
+import { majors } from './majors.js';
 
 const REGIONS = ['The North', 'The Central', 'The South', 'Central Highlands', 'Mekong Delta'];
 const DEPARTMENTS = ['Production', 'Maintenance', 'Quality (QA/QC)', 'Warehouse', 'Engineering', 'R&D', 'Planning', 'Purchasing', 'HR & Admin', 'Accounting', 'Finance', 'Sales', 'IT', 'HSE', 'Management'];
 const SALARY_TYPES = ['Hourly', 'Salary', 'Salary 1', 'Salary 2', 'Salary 3'];
 const LEVELS = ['Director', 'Manager', 'Supervisor', 'Team Leader', 'Nonmanager', 'Worker'];
 const RECRUIT_TYPES = ['New HC', 'Replacement', 'Seasonal', 'Internship', 'Outsourced'];
+const RECRUIT_SOURCES = [
+  'Giới thiệu nội bộ (nhân viên)', 'Website tuyển dụng (VietnamWorks, TopCV, CareerBuilder…)',
+  'ITviec', 'LinkedIn', 'Facebook / Mạng xã hội', 'Website công ty / Ứng viên tự nộp',
+  'Công ty tuyển dụng / Headhunter', 'Trung tâm giới thiệu việc làm', 'Ngày hội việc làm (Job Fair)',
+  'Trường / Đại học (Campus)', 'Tuyển dụng nội bộ / Điều chuyển', 'Nhân viên cũ quay lại (Rehire)',
+];
 
 export const groups = [
   {
@@ -39,7 +46,7 @@ export const groups = [
     fields: [
       { key: 'education_level', label: 'Học vấn / Trình độ', label_en: 'Education Level', type: 'select', options: ['THCS', 'THPT', 'Trung cấp', 'Cao đẳng (CĐ)', 'Đại học (ĐH)', 'Sau đại học'] },
       { key: 'school_name', label: 'Tên trường học', label_en: 'School / University', type: 'datalist', options: schools, self: true },
-      { key: 'major', label: 'Tên ngành học', label_en: 'Major', type: 'text', self: true },
+      { key: 'major', label: 'Tên ngành học', label_en: 'Major', type: 'datalist', options: majors, self: true },
     ],
   },
   {
@@ -69,6 +76,7 @@ export const groups = [
       { key: 'status', label: 'Trạng thái', label_en: 'Status', type: 'select', options: ['Đang làm việc', 'Nghỉ thai sản', 'Tạm hoãn HĐ', 'Đã nghỉ việc'] },
       { key: 'resignation_date', label: 'Ngày nghỉ việc', label_en: 'Resigned Date', type: 'date' },
       { key: 'recruitment_type', label: 'Loại hình tuyển dụng', label_en: 'Recruitment Type', type: 'datalist', options: RECRUIT_TYPES },
+      { key: 'recruitment_source', label: 'Nguồn tuyển dụng', label_en: 'Recruitment Source', type: 'datalist', options: RECRUIT_SOURCES },
       { key: 'factory', label: 'Nhà máy / Xưởng', label_en: 'Factory / Plant', type: 'text' },
       { key: 'production_line', label: 'Dây chuyền / Tổ', label_en: 'Production Line', type: 'text' },
       { key: 'shift', label: 'Ca làm việc', label_en: 'Work Shift', type: 'select', options: ['Hành chính', 'Ca 1', 'Ca 2', 'Ca 3', 'Ca gãy'] },

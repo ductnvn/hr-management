@@ -119,7 +119,7 @@ const STRINGS = {
     pub_success_msg: (n) => `Đã lưu ${n} thay đổi. Cảm ơn bạn!`,
     pub_success_none: 'Không có thay đổi nào. Cảm ơn bạn!',
     pub_another: 'Cập nhật hồ sơ khác',
-    pub_brand: '🏭 Hệ thống Quản lý Nhân sự nội bộ',
+    pub_brand: 'HR Dept. Form',
   },
   en: {
     app_title: 'HR Management',
@@ -227,7 +227,7 @@ const STRINGS = {
     pub_success_msg: (n) => `Saved ${n} change(s). Thank you!`,
     pub_success_none: 'No changes made. Thank you!',
     pub_another: 'Update another record',
-    pub_brand: '🏭 Internal HR Management System',
+    pub_brand: 'HR Dept. Form',
   },
 };
 

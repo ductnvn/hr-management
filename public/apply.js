@@ -36,10 +36,19 @@ async function load() {
   showForm();
 }
 
+function introBlock() {
+  return el('div', { className: 'intro' },
+    el('h3', {}, t('apply_intro_title')),
+    el('p', { className: 'welcome' }, t('apply_intro_welcome')),
+    el('p', {}, t('apply_intro_body')),
+  );
+}
+
 function showForm() {
   STATE = 'form';
   $('#subtitle').textContent = t('apply_sub');
   const form = el('form', { className: 'stack' });
+  form.append(introBlock());
   for (const f of FIELDS) form.append(labeled(f, fieldControl(f)));
   const err = el('p', { style: 'color:var(--danger);font-size:13px;margin:0' });
   const btn = el('button', { className: 'btn primary block', type: 'submit' }, t('apply_submit'));

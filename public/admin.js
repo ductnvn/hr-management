@@ -14,6 +14,7 @@ const el = (tag, props = {}, ...kids) => {
 const esc = (s) => (s == null ? '' : String(s));
 let TOKEN = localStorage.getItem('hr_token') || '';
 let SCHEMA = { groups: [], fields: [] };
+let INTERN_SCHEMA = { groups: [], fields: [] };
 let FIELD_BY_KEY = {};
 let CURRENT_VIEW = 'employees';
 
@@ -81,6 +82,7 @@ function render(view) {
   CURRENT_VIEW = view;
   $('#viewTitle').textContent = t('title_' + view);
   if (view === 'employees') return renderEmployees();
+  if (view === 'interns') return renderInterns();
   if (view === 'campaigns') return renderCampaigns();
   if (view === 'history') return renderHistory();
 }
@@ -224,6 +226,114 @@ async function exportCsv() {
   const res = await fetch('/api/employees.csv', { headers: { Authorization: 'Bearer ' + TOKEN } });
   const blob = await res.blob();
   const a = el('a', { href: URL.createObjectURL(blob), download: 'nhan-su.csv' });
+  document.body.append(a); a.click(); a.remove();
+}
+
+// ===========================================================================
+// THỰC TẬP SINH
+// ===========================================================================
+async function renderInterns() {
+  const content = $('#content');
+  const interns = await api('/api/interns');
+  const isNew = (s) => (s || '').startsWith('Mới nộp');
+  const isAcc = (s) => (s || '').startsWith('Nhận');
+
+  // Thẻ link ứng tuyển công khai
+  const url = location.origin + '/apply';
+  const linkInput = el('input', { value: url, readOnly: true });
+  const copyBtn = el('button', { className: 'btn sm' }, t('camp_copy'));
+  copyBtn.onclick = () => { navigator.clipboard.writeText(url); toast(t('copied'), 'ok'); };
+  const openBtn = el('a', { className: 'btn sm', href: url, target: '_blank' }, t('camp_openlink'));
+  const linkCard = el('div', { className: 'card', style: 'padding:16px 18px;margin-bottom:18px' },
+    el('strong', { style: 'font-size:15px' }, t('intern_link_title')),
+    el('div', { className: 'meta', style: 'margin:4px 0 10px' }, t('intern_link_desc')),
+    el('div', { className: 'link-row' }, linkInput, copyBtn, openBtn));
+
+  const bar = el('div', { className: 'toolbar' });
+  bar.append(
+    el('input', { type: 'search', id: 'internSearch', placeholder: t('search_ph'), value: '' }),
+    (() => { const b = el('button', { className: 'btn' }, t('export_interns')); b.onclick = () => downloadCsv('/api/interns.csv', 'thuc-tap-sinh.csv'); return b; })(),
+    (() => { const b = el('button', { className: 'btn primary' }, t('intern_add')); b.onclick = () => openInternModal(); return b; })(),
+  );
+
+  content.replaceChildren(
+    el('div', { className: 'stats' },
+      stat(interns.length, t('intern_stat_total')),
+      stat(interns.filter((i) => isNew(i.status)).length, t('intern_stat_new')),
+      stat(interns.filter((i) => isAcc(i.status)).length, t('intern_stat_accepted')),
+    ),
+    linkCard, bar, internTable(interns),
+  );
+  const s = $('#internSearch');
+  s?.addEventListener('input', debounce(async (ev) => {
+    const rows = await api('/api/interns' + (ev.target.value ? '?q=' + encodeURIComponent(ev.target.value) : ''));
+    $('#internTableCard').replaceWith(internTable(rows));
+  }, 250));
+}
+
+function internTable(rows) {
+  if (!rows.length)
+    return el('div', { className: 'card', id: 'internTableCard' }, el('div', { className: 'empty' }, t('intern_empty')));
+  const heads = [t('th_name'), t('th_phone'), 'Email', t('it_th_uni'), t('it_th_pos'), t('it_th_year'), t('th_status'), ''];
+  const thead = el('thead', {}, el('tr', {}, ...heads.map((h) => el('th', {}, h))));
+  const tbody = el('tbody');
+  for (const r of rows) {
+    tbody.append(el('tr', {},
+      el('td', {}, avatar(r.full_name), el('strong', {}, r.full_name || '—')),
+      el('td', {}, r.phone || '—'),
+      el('td', {}, r.email || '—'),
+      el('td', {}, r.university || '—'),
+      el('td', {}, r.position_applied || '—'),
+      el('td', {}, r.year_of_study || '—'),
+      el('td', {}, internStatusBadge(r.status)),
+      el('td', {}, el('div', { className: 'row-actions' },
+        iconBtn('✏️', t('edit'), () => openInternModal(r)),
+        iconBtn('🗑️', t('del'), () => removeIntern(r)))),
+    ));
+  }
+  return el('div', { className: 'card', id: 'internTableCard' }, el('div', { className: 'table-wrap' }, el('table', {}, thead, tbody)));
+}
+function internStatusBadge(s) {
+  if (!s) return el('span', {}, '—');
+  const cls = s.startsWith('Nhận') ? 'ok' : s.startsWith('Từ chối') ? 'off' : s.startsWith('Mới nộp') ? 'neutral' : 'warn';
+  return el('span', { className: 'badge ' + cls }, s);
+}
+
+function openInternModal(it) {
+  const isEdit = !!it;
+  const form = el('form', { id: 'internForm' });
+  for (const g of INTERN_SCHEMA.groups) {
+    const grid = el('div', { className: 'grid2' });
+    for (const f of g.fields) grid.append(fieldInput(f, it?.[f.key], f.type === 'textarea'));
+    form.append(el('div', { className: 'form-group' }, el('h3', {}, `${g.icon} ${glabel(g)}`), grid));
+  }
+  const modal = buildModal(isEdit ? t('intern_modal_edit') : t('intern_modal_add'), form, [
+    { label: t('cancel'), className: 'btn', onclick: closeModal },
+    { label: isEdit ? t('save_changes') : t('add_new'), className: 'btn primary', submit: true },
+  ]);
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = collectForm(form);
+    try {
+      if (isEdit) await api('/api/interns/' + it.id, { method: 'PUT', body: JSON.stringify(data) });
+      else await api('/api/interns', { method: 'POST', body: JSON.stringify(data) });
+      closeModal(); toast(isEdit ? t('toast_saved') : t('intern_added'), 'ok');
+      renderInterns();
+    } catch (err) { toast(err.message, 'err'); }
+  });
+  document.body.append(modal);
+}
+
+async function removeIntern(r) {
+  if (!confirm(t('intern_del_confirm', r.full_name))) return;
+  try { await api('/api/interns/' + r.id, { method: 'DELETE' }); toast(t('toast_deleted'), 'ok'); renderInterns(); }
+  catch (err) { toast(err.message, 'err'); }
+}
+
+async function downloadCsv(path, filename) {
+  const res = await fetch(path, { headers: { Authorization: 'Bearer ' + TOKEN } });
+  const blob = await res.blob();
+  const a = el('a', { href: URL.createObjectURL(blob), download: filename });
   document.body.append(a); a.click(); a.remove();
 }
 
@@ -564,6 +674,7 @@ async function start() {
   $('#app').classList.remove('hidden');
   applyStaticI18n();
   SCHEMA = await api('/api/fields');
+  INTERN_SCHEMA = await api('/api/intern-fields');
   FIELD_BY_KEY = Object.fromEntries(SCHEMA.fields.map((f) => [f.key, f]));
   render('employees');
 }

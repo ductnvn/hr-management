@@ -1,0 +1,35 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Internship Application</title>
+<link rel="stylesheet" href="/styles.css">
+<style>
+  body { background: linear-gradient(160deg, #1e3a8a, #1d4ed8); min-height: 100vh; }
+  .wrap { max-width: 580px; margin: 0 auto; padding: 28px 16px 60px; }
+  .sheet { background: #fff; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,.25); overflow: hidden; }
+  .sheet-head { padding: 24px; background: var(--brand-soft); border-bottom: 1px solid var(--line); }
+  .sheet-head h1 { margin: 0 0 4px; font-size: 20px; }
+  .sheet-head p { margin: 0; color: var(--muted); font-size: 13px; }
+  .sheet-body { padding: 24px; }
+  .stack { display: flex; flex-direction: column; gap: 14px; }
+  .btn.block { width: 100%; justify-content: center; padding: 12px; font-size: 15px; }
+  .brandbar { text-align: center; color: rgba(255,255,255,.85); font-size: 13px; margin-top: 18px; }
+  .toprow { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+  #langToggle { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.35); color: #fff; padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 700; cursor: pointer; }
+  #langToggle:hover { background: rgba(255,255,255,.28); }
+  .success { text-align: center; padding: 30px; }
+  .success .ico { font-size: 56px; }
+</style>
+
+<div class="wrap">
+  <div class="toprow"><button id="langToggle" type="button">EN</button></div>
+  <div class="sheet">
+    <div class="sheet-head">
+      <h1 id="title">Đơn ứng tuyển Thực tập sinh</h1>
+      <p id="subtitle">Điền thông tin bên dưới và gửi cho bộ phận Nhân sự</p>
+    </div>
+    <div class="sheet-body" id="body"></div>
+  </div>
+  <div class="brandbar" id="brandbar">HR Dept. Form</div>
+</div>
+
+<script type="module" src="/apply.js"></script>

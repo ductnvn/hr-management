@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname } from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { groups, fields, fieldByKey, fieldKeys } from './fields.js';
+import { groups, fields, fieldByKey, fieldKeys, internGroups, internFields, internFieldByKey, internApplyKeys } from './fields.js';
 import * as store from './db.js';
 import { parseXlsx, parseCsv } from './xlsx.js';
 
@@ -28,6 +28,7 @@ const server = http.createServer(async (req, res) => {
     // Trang cập nhật công khai: /update/<token>
     if (path === '/' || path === '/index.html') return sendFile(res, join(PUBLIC, 'index.html'));
     if (path.startsWith('/update/')) return sendFile(res, join(PUBLIC, 'update.html'));
+    if (path === '/apply' || path.startsWith('/apply/')) return sendFile(res, join(PUBLIC, 'apply.html'));
 
     // File tĩnh trong /public
     const safe = join(PUBLIC, path.replace(/^\/+/, ''));
@@ -56,6 +57,26 @@ async function handleApi(req, res, url, path) {
 
   if (path === '/api/fields' && method === 'GET') {
     return sendJson(res, 200, { groups, fields });
+  }
+
+  // Schema thực tập sinh (công khai — form ứng tuyển cần đọc)
+  if (path === '/api/intern-fields' && method === 'GET') {
+    return sendJson(res, 200, { groups: internGroups, fields: internFields });
+  }
+
+  // Ứng viên thực tập nộp đơn (công khai, tạo bản ghi mới)
+  if (path === '/api/public/intern-apply' && method === 'POST') {
+    const body = await readBody(req);
+    const values = body.values || {};
+    const data = {};
+    for (const k of internApplyKeys) if (values[k] !== undefined) data[k] = String(values[k]);
+    for (const f of internFields) {
+      if (f.required && f.apply && (!data[f.key] || !data[f.key].trim()))
+        return sendJson(res, 400, { error: `Thiếu thông tin bắt buộc: ${f.label}` });
+    }
+    data.status = 'Mới nộp (New)';
+    store.createIntern(data, 'public');
+    return sendJson(res, 201, { ok: true });
   }
 
   // Endpoint công khai cho nhân sự tự cập nhật
@@ -124,6 +145,32 @@ async function handleApi(req, res, url, path) {
 
   if (path === '/api/self-updates' && method === 'GET')
     return sendJson(res, 200, store.listSelfUpdates());
+
+  // Thực tập sinh (admin)
+  if (path === '/api/interns' && method === 'GET')
+    return sendJson(res, 200, store.listInterns(url.searchParams.get('q')));
+  if (path === '/api/interns' && method === 'POST') {
+    const body = await readBody(req);
+    const err = validateIntern(body);
+    if (err) return sendJson(res, 400, { error: err });
+    return sendJson(res, 201, store.createIntern(body, 'admin'));
+  }
+  if (path === '/api/interns.csv' && method === 'GET') return exportInternsCsv(res);
+  const internMatch = path.match(/^\/api\/interns\/(\d+)$/);
+  if (internMatch) {
+    const id = Number(internMatch[1]);
+    if (method === 'GET') {
+      const it = store.getIntern(id);
+      return it ? sendJson(res, 200, it) : sendJson(res, 404, { error: 'Không tìm thấy' });
+    }
+    if (method === 'PUT') {
+      const body = await readBody(req);
+      const err = validateIntern(body);
+      if (err) return sendJson(res, 400, { error: err });
+      return sendJson(res, 200, store.updateIntern(id, body));
+    }
+    if (method === 'DELETE') return sendJson(res, 200, { ok: store.deleteIntern(id) });
+  }
 
   // Nhập từ Excel/CSV: bước 1 — phân tích tệp thành lưới dữ liệu
   if (path === '/api/import/parse' && method === 'POST') {
@@ -229,6 +276,13 @@ function validate(body) {
   }
   return null;
 }
+function validateIntern(body) {
+  for (const f of internFields) {
+    if (f.required && (!body[f.key] || !String(body[f.key]).trim()))
+      return `Thiếu trường bắt buộc: ${f.label}`;
+  }
+  return null;
+}
 
 // --- CSV --------------------------------------------------------------------
 function exportCsv(res) {
@@ -245,6 +299,24 @@ function exportCsv(res) {
   res.writeHead(200, {
     'Content-Type': 'text/csv; charset=utf-8',
     'Content-Disposition': 'attachment; filename="nhan-su.csv"',
+  });
+  res.end(csv);
+}
+
+function exportInternsCsv(res) {
+  const rows = store.listInterns();
+  const cols = ['id', ...internFields.map((f) => f.key), 'created_at'];
+  const header = ['ID', ...internFields.map((f) => f.label), 'Ngày nộp'];
+  const esc = (v) => {
+    const s = v == null ? '' : String(v);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const lines = [header.map(esc).join(',')];
+  for (const r of rows) lines.push(cols.map((c) => esc(r[c])).join(','));
+  const csv = '﻿' + lines.join('\r\n');
+  res.writeHead(200, {
+    'Content-Type': 'text/csv; charset=utf-8',
+    'Content-Disposition': 'attachment; filename="thuc-tap-sinh.csv"',
   });
   res.end(csv);
 }

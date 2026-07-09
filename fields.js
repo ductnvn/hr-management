@@ -122,3 +122,40 @@ export const groups = [
 export const fields = groups.flatMap((g) => g.fields);
 export const fieldByKey = Object.fromEntries(fields.map((f) => [f.key, f]));
 export const fieldKeys = fields.map((f) => f.key);
+
+// ===========================================================================
+// SCHEMA THỰC TẬP SINH (INTERN)
+// `apply: true` = trường hiển thị trên form ứng tuyển công khai cho ứng viên.
+// ===========================================================================
+const YEAR_OPTIONS = ['1st year (Năm 1)', '2nd year (Năm 2)', '3rd year (Năm 3)', 'Final year (Năm cuối)', 'Fresh Graduate (Mới tốt nghiệp)', 'Other (Khác)'];
+const INTERN_POSITIONS = ['CNC Intern', 'QA/QC Intern', 'Mechanical/Electrical Intern', 'Back Office Intern (HR, Finance, Supply Chain, Purchasing, etc.)'];
+const INTERN_STATUS = ['Mới nộp (New)', 'Đang xem xét (Reviewing)', 'Phỏng vấn (Interview)', 'Nhận (Accepted)', 'Từ chối (Rejected)', 'Đã kết thúc (Completed)'];
+
+export const internGroups = [
+  {
+    title: 'Thông tin ứng viên', title_en: 'Applicant Information', icon: '🎓',
+    fields: [
+      { key: 'full_name', label: 'Họ và Tên', label_en: 'Full Name', type: 'text', required: true, apply: true },
+      { key: 'phone', label: 'Số điện thoại liên hệ', label_en: 'Phone Number', type: 'tel', required: true, apply: true },
+      { key: 'email', label: 'Địa chỉ Email', label_en: 'Email Address', type: 'email', required: true, apply: true },
+      { key: 'university', label: 'Trường Đại học / Cao đẳng', label_en: 'University / College', type: 'datalist', options: schools, required: true, apply: true },
+      { key: 'major', label: 'Chuyên ngành', label_en: 'Major', type: 'datalist', options: majors, apply: true },
+      { key: 'year_of_study', label: 'Sinh viên năm thứ', label_en: 'Current Year of Study', type: 'select', options: YEAR_OPTIONS, required: true, apply: true },
+      { key: 'position_applied', label: 'Vị trí ứng tuyển', label_en: 'Position Applying For', type: 'select', options: INTERN_POSITIONS, required: true, apply: true },
+      { key: 'expected_start', label: 'Thời gian bắt đầu dự kiến', label_en: 'Expected Start Date', type: 'date', apply: true },
+      { key: 'expected_end', label: 'Thời gian kết thúc dự kiến', label_en: 'Expected End Date', type: 'date', apply: true },
+    ],
+  },
+  {
+    title: 'Theo dõi (nội bộ)', title_en: 'Tracking (internal)', icon: '🗂️',
+    fields: [
+      { key: 'status', label: 'Trạng thái', label_en: 'Status', type: 'select', options: INTERN_STATUS },
+      { key: 'notes', label: 'Ghi chú', label_en: 'Notes', type: 'textarea' },
+    ],
+  },
+];
+
+export const internFields = internGroups.flatMap((g) => g.fields);
+export const internFieldByKey = Object.fromEntries(internFields.map((f) => [f.key, f]));
+export const internFieldKeys = internFields.map((f) => f.key);
+export const internApplyKeys = internFields.filter((f) => f.apply).map((f) => f.key);

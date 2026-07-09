@@ -50,6 +50,10 @@ App là **server Node + database SQLite (file)**, nên hãy dùng host chạy ti
 - Cho phép chỉnh tay việc ghép cột trước khi nhập. Khi nhập: **trùng Mã số thì cập nhật, còn lại thêm mới** (không tạo bản ghi trùng).
 - Bí danh cột & logic ghép nằm trong [admin.js](public/admin.js) (`IMPORT_ALIASES`), bộ đọc tệp ở [xlsx.js](xlsx.js).
 
+### 🎓 Quản lý Thực tập sinh
+- Tab **Thực tập sinh** riêng: danh sách ứng viên (thêm/sửa/xóa, tìm kiếm, xuất CSV), theo dõi trạng thái (Mới nộp → Xem xét → Phỏng vấn → Nhận/Từ chối).
+- **Link ứng tuyển công khai** (`/apply`) để gửi cho ứng viên: họ điền 9 thông tin (họ tên, SĐT, email, trường ĐH/CĐ, chuyên ngành, năm học, vị trí ứng tuyển, thời gian bắt đầu/kết thúc dự kiến) và gửi — hồ sơ **tự động vào database thực tập sinh**. Trường học/chuyên ngành có gợi ý sẵn, form song ngữ.
+
 ### 🌐 Song ngữ Việt – Anh
 - Nút chuyển ngôn ngữ ở góc dưới thanh bên (và góc trên trang tự cập nhật). Toàn bộ giao diện + nhãn trường chuyển giữa **Tiếng Việt** và **English**, ghi nhớ lựa chọn theo trình duyệt.
 - Chỉnh nhãn/thuật ngữ trong [i18n.js](public/i18n.js); nhãn trường Anh–Việt nằm ngay trong [fields.js](fields.js) (`label` / `label_en`).

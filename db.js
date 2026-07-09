@@ -1,7 +1,7 @@
 // Lớp truy cập dữ liệu — dùng SQLite tích hợp sẵn của Node (node:sqlite), không cần cài thêm.
 import { DatabaseSync } from 'node:sqlite';
 import { randomBytes } from 'node:crypto';
-import { fieldKeys } from './fields.js';
+import { fieldKeys, internFieldKeys } from './fields.js';
 
 const db = new DatabaseSync(process.env.HR_DB || 'hr.db');
 db.exec('PRAGMA journal_mode = WAL;');
@@ -48,6 +48,22 @@ CREATE TABLE IF NOT EXISTS self_updates (
   submitted_at TEXT NOT NULL
 );
 `);
+
+// --- Bảng thực tập sinh -----------------------------------------------------
+const internColumns = internFieldKeys.map((k) => `  "${k}" TEXT`).join(',\n');
+db.exec(`
+CREATE TABLE IF NOT EXISTS interns (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+${internColumns},
+  source TEXT,                    -- 'admin' | 'public'
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+`);
+const internExisting = new Set(db.prepare('PRAGMA table_info(interns)').all().map((c) => c.name));
+for (const k of internFieldKeys) {
+  if (!internExisting.has(k)) db.exec(`ALTER TABLE interns ADD COLUMN "${k}" TEXT`);
+}
 
 const now = () => new Date().toISOString();
 
@@ -183,6 +199,50 @@ function nz(v) {
   return v === undefined || v === null ? '' : String(v);
 }
 
+// --- Thực tập sinh ----------------------------------------------------------
+export function listInterns(q) {
+  if (q && q.trim()) {
+    const like = `%${q.trim()}%`;
+    return db
+      .prepare(
+        `SELECT * FROM interns
+         WHERE full_name LIKE ? OR phone LIKE ? OR email LIKE ?
+            OR university LIKE ? OR position_applied LIKE ?
+         ORDER BY id DESC`
+      )
+      .all(like, like, like, like, like);
+  }
+  return db.prepare('SELECT * FROM interns ORDER BY id DESC').all();
+}
+export function getIntern(id) {
+  return db.prepare('SELECT * FROM interns WHERE id = ?').get(id);
+}
+export function createIntern(data, source = 'admin') {
+  const cols = internFieldKeys.filter((k) => data[k] !== undefined);
+  const ts = now();
+  const allCols = [...cols, 'source', 'created_at', 'updated_at'];
+  const placeholders = allCols.map(() => '?').join(', ');
+  const values = [...cols.map((k) => nz(data[k])), source, ts, ts];
+  const info = db
+    .prepare(`INSERT INTO interns (${allCols.map((c) => `"${c}"`).join(', ')}) VALUES (${placeholders})`)
+    .run(...values);
+  return getIntern(info.lastInsertRowid);
+}
+export function updateIntern(id, data) {
+  const cols = internFieldKeys.filter((k) => data[k] !== undefined);
+  if (cols.length === 0) return getIntern(id);
+  const set = [...cols.map((k) => `"${k}" = ?`), 'updated_at = ?'].join(', ');
+  const values = [...cols.map((k) => nz(data[k])), now(), id];
+  db.prepare(`UPDATE interns SET ${set} WHERE id = ?`).run(...values);
+  return getIntern(id);
+}
+export function deleteIntern(id) {
+  return db.prepare('DELETE FROM interns WHERE id = ?').run(id).changes > 0;
+}
+export function countInterns() {
+  return db.prepare('SELECT COUNT(*) AS c FROM interns').get().c;
+}
+
 // --- Dữ liệu mẫu ------------------------------------------------------------
 if (countEmployees() === 0) {
   const samples = [
@@ -191,6 +251,14 @@ if (countEmployees() === 0) {
     { employee_code: 'NV0003', full_name: 'Lê Hoàng Cường', gender: 'Nam', date_of_birth: '1988-11-05', phone: '0987654321', email: 'cuong.lh@congty.vn', department: 'Production', position: 'Team Leader', job_title: 'Production Line Leader', level: 'Team Leader', education_level: 'Đại học (ĐH)', hire_date: '2016-09-10', status: 'Đang làm việc', factory: 'Plant 2', production_line: 'Line A', shift: 'Ca 2', recruitment_type: 'New HC', region: 'The Central', contract_type: 'Không xác định thời hạn' },
   ];
   for (const s of samples) createEmployee(s);
+}
+
+if (countInterns() === 0) {
+  const internSamples = [
+    { full_name: 'Phạm Minh Khoa', phone: '0905112233', email: 'khoa.pm@gmail.com', university: 'Trường Đại học Bách khoa - Đại học Đà Nẵng', major: 'Kỹ thuật cơ khí', year_of_study: 'Final year (Năm cuối)', position_applied: 'CNC Intern', expected_start: '2026-08-01', expected_end: '2026-11-30', status: 'Mới nộp (New)' },
+    { full_name: 'Nguyễn Thị Hồng', phone: '0938446677', email: 'hong.nt@gmail.com', university: 'Trường Đại học Kinh tế - Đại học Đà Nẵng', major: 'Quản trị nhân lực', year_of_study: '3rd year (Năm 3)', position_applied: 'Back Office Intern (HR, Finance, Supply Chain, Purchasing, etc.)', expected_start: '2026-07-15', expected_end: '2026-10-15', status: 'Đang xem xét (Reviewing)' },
+  ];
+  for (const s of internSamples) createIntern(s, 'admin');
 }
 
 export default db;

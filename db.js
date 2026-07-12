@@ -1,9 +1,16 @@
 // Lớp truy cập dữ liệu — dùng SQLite tích hợp sẵn của Node (node:sqlite), không cần cài thêm.
 import { DatabaseSync } from 'node:sqlite';
 import { randomBytes } from 'node:crypto';
+import { mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { fieldKeys, internFieldKeys } from './fields.js';
 
-const db = new DatabaseSync(process.env.HR_DB || 'hr.db');
+// Đường dẫn DB có thể trỏ vào Volume bền (vd HR_DB=/data/hr.db trên Railway/Render).
+// Tự tạo thư mục chứa nếu chưa có, tránh lỗi khi mount volume ở thư mục mới.
+const DB_PATH = process.env.HR_DB || 'hr.db';
+try { const dir = dirname(DB_PATH); if (dir && dir !== '.') mkdirSync(dir, { recursive: true }); } catch { /* bỏ qua */ }
+
+const db = new DatabaseSync(DB_PATH);
 db.exec('PRAGMA journal_mode = WAL;');
 db.exec('PRAGMA foreign_keys = ON;');
 
@@ -258,6 +265,57 @@ export function deleteIntern(id) {
 }
 export function countInterns() {
   return db.prepare('SELECT COUNT(*) AS c FROM interns').get().c;
+}
+
+// --- Sao lưu / Khôi phục toàn bộ dữ liệu ------------------------------------
+const BACKUP_TABLES = ['employees', 'interns', 'campaigns', 'self_updates'];
+function tableColumns(name) {
+  return db.prepare(`PRAGMA table_info(${name})`).all().map((c) => c.name);
+}
+function dumpTable(name) {
+  const cols = tableColumns(name);
+  return db.prepare(`SELECT * FROM ${name}`).all().map((r) => {
+    const o = {};
+    for (const k of cols) {
+      let v = r[k];
+      if (v instanceof Uint8Array) v = { __b64: Buffer.from(v).toString('base64') }; // BLOB (CV) → base64
+      o[k] = v;
+    }
+    return o;
+  });
+}
+export function dumpAll() {
+  const tables = {};
+  for (const t of BACKUP_TABLES) tables[t] = dumpTable(t);
+  return { app: 'hr-management', version: 1, exportedAt: now(), tables };
+}
+export function restoreAll(data) {
+  if (!data || !data.tables) throw new Error('File sao lưu không hợp lệ');
+  const counts = {};
+  db.exec('BEGIN');
+  try {
+    for (const name of BACKUP_TABLES) {
+      const rows = data.tables[name];
+      if (!Array.isArray(rows)) continue;
+      const cols = new Set(tableColumns(name));
+      db.exec(`DELETE FROM ${name}`);
+      for (const r of rows) {
+        const keys = Object.keys(r).filter((k) => cols.has(k));
+        const vals = keys.map((k) => {
+          let v = r[k];
+          if (v && typeof v === 'object' && v.__b64 !== undefined) v = Buffer.from(v.__b64, 'base64');
+          return v;
+        });
+        db.prepare(`INSERT INTO ${name} (${keys.map((k) => `"${k}"`).join(', ')}) VALUES (${keys.map(() => '?').join(', ')})`).run(...vals);
+      }
+      counts[name] = rows.length;
+    }
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+  return counts;
 }
 
 // --- Dữ liệu mẫu ------------------------------------------------------------

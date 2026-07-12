@@ -149,6 +149,26 @@ async function handleApi(req, res, url, path) {
   if (path === '/api/self-updates' && method === 'GET')
     return sendJson(res, 200, store.listSelfUpdates());
 
+  // Sao lưu toàn bộ dữ liệu (tải file JSON, gồm cả CV)
+  if (path === '/api/backup' && method === 'GET') {
+    const data = JSON.stringify(store.dumpAll());
+    res.writeHead(200, {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Content-Disposition': `attachment; filename="hr-backup-${new Date().toISOString().slice(0, 10)}.json"`,
+    });
+    return res.end(data);
+  }
+  // Khôi phục từ file sao lưu (ghi đè dữ liệu hiện tại)
+  if (path === '/api/restore' && method === 'POST') {
+    const body = await readBody(req);
+    try {
+      const counts = store.restoreAll(body);
+      return sendJson(res, 200, { ok: true, counts });
+    } catch (e) {
+      return sendJson(res, 400, { error: e.message });
+    }
+  }
+
   // Thực tập sinh (admin)
   if (path === '/api/interns' && method === 'GET')
     return sendJson(res, 200, store.listInterns(url.searchParams.get('q')));

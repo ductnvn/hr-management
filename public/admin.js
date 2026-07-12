@@ -85,6 +85,7 @@ function render(view) {
   if (view === 'interns') return renderInterns();
   if (view === 'campaigns') return renderCampaigns();
   if (view === 'history') return renderHistory();
+  if (view === 'backup') return renderBackup();
 }
 
 // ===========================================================================
@@ -653,6 +654,45 @@ async function renderHistory() {
   }
   content.replaceChildren(el('div', { className: 'card' }, el('div', { className: 'table-wrap' },
     el('table', {}, el('thead', {}, el('tr', {}, el('th', {}, t('hist_time')), el('th', {}, t('hist_emp')), el('th', {}, t('hist_changes')))), tbody))));
+}
+
+// ===========================================================================
+// SAO LƯU & KHÔI PHỤC
+// ===========================================================================
+function renderBackup() {
+  const content = $('#content');
+
+  const warn = el('div', { className: 'card', style: 'padding:16px 18px;margin-bottom:18px;border-color:#fde68a;background:#fffbeb' },
+    el('strong', { style: 'color:#92400e' }, t('bk_warn_title')),
+    el('div', { style: 'color:#92400e;font-size:13.5px;margin-top:6px;line-height:1.6' }, t('bk_warn_body')));
+
+  const dlBtn = el('button', { className: 'btn primary' }, t('bk_download_btn'));
+  dlBtn.onclick = () => downloadCsv('/api/backup', 'hr-backup-' + new Date().toISOString().slice(0, 10) + '.json');
+  const dlCard = el('div', { className: 'card', style: 'padding:18px 20px;margin-bottom:16px' },
+    el('h3', { style: 'margin:0 0 6px' }, t('bk_download_title')),
+    el('div', { className: 'meta', style: 'margin-bottom:12px' }, t('bk_download_desc')),
+    dlBtn);
+
+  const fileInput = el('input', { type: 'file', accept: '.json', style: 'margin-bottom:12px' });
+  const rsBtn = el('button', { className: 'btn danger' }, t('bk_restore_btn'));
+  rsBtn.onclick = async () => {
+    const file = fileInput.files[0];
+    if (!file) return toast(t('bk_restore_btn'), 'err');
+    if (!confirm(t('bk_restore_confirm'))) return;
+    try {
+      const text = await file.text();
+      const r = await api('/api/restore', { method: 'POST', body: text });
+      const total = Object.values(r.counts || {}).reduce((a, b) => a + b, 0);
+      toast(t('bk_restored', total), 'ok');
+      render('employees');
+    } catch (e) { toast(e.message, 'err'); }
+  };
+  const rsCard = el('div', { className: 'card', style: 'padding:18px 20px' },
+    el('h3', { style: 'margin:0 0 6px' }, t('bk_restore_title')),
+    el('div', { className: 'meta', style: 'margin-bottom:12px' }, t('bk_restore_desc')),
+    fileInput, el('div', {}, rsBtn));
+
+  content.replaceChildren(warn, dlCard, rsCard);
 }
 
 // ===========================================================================

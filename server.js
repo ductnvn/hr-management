@@ -75,7 +75,10 @@ async function handleApi(req, res, url, path) {
         return sendJson(res, 400, { error: `Thiếu thông tin bắt buộc: ${f.label}` });
     }
     data.status = 'Mới nộp (New)';
-    store.createIntern(data, 'public');
+    const intern = store.createIntern(data, 'public');
+    // Đính kèm CV (tùy chọn)
+    const cvErr = saveCv(intern.id, body.cv);
+    if (cvErr) return sendJson(res, 201, { ok: true, cvWarning: cvErr });
     return sendJson(res, 201, { ok: true });
   }
 
@@ -170,6 +173,18 @@ async function handleApi(req, res, url, path) {
       return sendJson(res, 200, store.updateIntern(id, body));
     }
     if (method === 'DELETE') return sendJson(res, 200, { ok: store.deleteIntern(id) });
+  }
+  // Tải CV của thực tập sinh
+  const cvMatch = path.match(/^\/api\/interns\/(\d+)\/cv$/);
+  if (cvMatch && method === 'GET') {
+    const cv = store.getInternCv(Number(cvMatch[1]));
+    if (!cv || !cv.cv_data) return sendJson(res, 404, { error: 'Không có CV' });
+    const name = cv.cv_filename || 'cv';
+    res.writeHead(200, {
+      'Content-Type': cv.cv_mime || 'application/octet-stream',
+      'Content-Disposition': `attachment; filename="cv"; filename*=UTF-8''${encodeURIComponent(name)}`,
+    });
+    return res.end(Buffer.from(cv.cv_data));
   }
 
   // Nhập từ Excel/CSV: bước 1 — phân tích tệp thành lưới dữ liệu
@@ -281,6 +296,20 @@ function validateIntern(body) {
     if (f.required && (!body[f.key] || !String(body[f.key]).trim()))
       return `Thiếu trường bắt buộc: ${f.label}`;
   }
+  return null;
+}
+
+const CV_MAX = 5 * 1024 * 1024; // 5MB
+const CV_EXT = ['.pdf', '.doc', '.docx', '.png', '.jpg', '.jpeg'];
+// Lưu CV nếu hợp lệ; trả về chuỗi lỗi (cảnh báo) nếu bỏ qua, null nếu OK/không có.
+function saveCv(internId, cv) {
+  if (!cv || !cv.dataBase64) return null;
+  const name = (cv.filename || 'cv').slice(0, 200);
+  const ext = (name.match(/\.[^.]+$/) || [''])[0].toLowerCase();
+  if (!CV_EXT.includes(ext)) return 'Định dạng CV không hỗ trợ';
+  const buf = Buffer.from(cv.dataBase64, 'base64');
+  if (buf.length === 0 || buf.length > CV_MAX) return 'CV vượt quá 5MB';
+  store.setInternCv(internId, name, cv.mime || 'application/octet-stream', buf);
   return null;
 }
 

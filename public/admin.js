@@ -274,10 +274,13 @@ async function renderInterns() {
 function internTable(rows) {
   if (!rows.length)
     return el('div', { className: 'card', id: 'internTableCard' }, el('div', { className: 'empty' }, t('intern_empty')));
-  const heads = [t('th_name'), t('th_phone'), 'Email', t('it_th_uni'), t('it_th_pos'), t('it_th_year'), t('th_status'), ''];
+  const heads = [t('th_name'), t('th_phone'), 'Email', t('it_th_uni'), t('it_th_pos'), t('it_th_year'), t('it_th_cv'), t('th_status'), ''];
   const thead = el('thead', {}, el('tr', {}, ...heads.map((h) => el('th', {}, h))));
   const tbody = el('tbody');
   for (const r of rows) {
+    const cvCell = r.has_cv
+      ? (() => { const a = el('button', { className: 'btn sm ghost', title: r.cv_filename || 'CV' }, t('intern_cv_download')); a.onclick = () => downloadCv(r.id, r.cv_filename); return a; })()
+      : el('span', { className: 'meta' }, t('intern_cv_none'));
     tbody.append(el('tr', {},
       el('td', {}, avatar(r.full_name), el('strong', {}, r.full_name || '—')),
       el('td', {}, r.phone || '—'),
@@ -285,6 +288,7 @@ function internTable(rows) {
       el('td', {}, r.university || '—'),
       el('td', {}, r.position_applied || '—'),
       el('td', {}, r.year_of_study || '—'),
+      el('td', {}, cvCell),
       el('td', {}, internStatusBadge(r.status)),
       el('td', {}, el('div', { className: 'row-actions' },
         iconBtn('✏️', t('edit'), () => openInternModal(r)),
@@ -334,6 +338,13 @@ async function downloadCsv(path, filename) {
   const res = await fetch(path, { headers: { Authorization: 'Bearer ' + TOKEN } });
   const blob = await res.blob();
   const a = el('a', { href: URL.createObjectURL(blob), download: filename });
+  document.body.append(a); a.click(); a.remove();
+}
+async function downloadCv(id, filename) {
+  const res = await fetch('/api/interns/' + id + '/cv', { headers: { Authorization: 'Bearer ' + TOKEN } });
+  if (!res.ok) return toast('CV không tồn tại', 'err');
+  const blob = await res.blob();
+  const a = el('a', { href: URL.createObjectURL(blob), download: filename || 'cv' });
   document.body.append(a); a.click(); a.remove();
 }
 

@@ -50,18 +50,41 @@ function showForm() {
   const form = el('form', { className: 'stack' });
   form.append(introBlock());
   for (const f of FIELDS) form.append(labeled(f, fieldControl(f)));
+
+  // Đính kèm CV (tùy chọn)
+  const cvInput = el('input', { type: 'file', name: 'cvfile', accept: '.pdf,.doc,.docx,.png,.jpg,.jpeg' });
+  form.append(el('label', { className: 'field' },
+    el('span', {}, t('apply_cv_label')), cvInput,
+    el('small', { style: 'color:var(--muted);font-size:12px;margin-top:4px;display:block' }, t('apply_cv_hint'))));
+
   const err = el('p', { style: 'color:var(--danger);font-size:13px;margin:0' });
   const btn = el('button', { className: 'btn primary block', type: 'submit' }, t('apply_submit'));
   form.append(err, btn);
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    btn.disabled = true; btn.textContent = t('apply_submitting'); err.textContent = '';
+    err.textContent = '';
     const values = {};
     for (const inp of form.querySelectorAll('[name]')) if (inp.name.startsWith('f_')) values[inp.name.slice(2)] = inp.value;
+
+    let cv = null;
+    const file = cvInput.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { err.textContent = t('apply_cv_toobig'); return; }
+      const ext = (file.name.match(/\.[^.]+$/) || [''])[0].toLowerCase();
+      if (!['.pdf', '.doc', '.docx', '.png', '.jpg', '.jpeg'].includes(ext)) { err.textContent = t('apply_cv_badtype'); return; }
+      const dataBase64 = await new Promise((resolve) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(String(fr.result).split(',')[1]);
+        fr.readAsDataURL(file);
+      });
+      cv = { filename: file.name, mime: file.type, dataBase64 };
+    }
+
+    btn.disabled = true; btn.textContent = t('apply_submitting');
     try {
       const res = await fetch('/api/public/intern-apply', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ values }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ values, cv }),
       });
       const r = await res.json();
       if (r.error) throw new Error(r.error);

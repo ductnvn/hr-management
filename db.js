@@ -64,6 +64,16 @@ const internExisting = new Set(db.prepare('PRAGMA table_info(interns)').all().ma
 for (const k of internFieldKeys) {
   if (!internExisting.has(k)) db.exec(`ALTER TABLE interns ADD COLUMN "${k}" TEXT`);
 }
+// Cột đính kèm CV (lưu ngay trong DB dưới dạng BLOB).
+for (const col of ['cv_filename TEXT', 'cv_mime TEXT', 'cv_data BLOB']) {
+  const name = col.split(' ')[0];
+  if (!internExisting.has(name)) db.exec(`ALTER TABLE interns ADD COLUMN ${col}`);
+}
+
+// Cột trả về cho client (KHÔNG kèm cv_data để tránh gửi binary lớn; thay bằng cờ has_cv).
+const internSelectCols =
+  ['id', ...internFieldKeys, 'source', 'created_at', 'updated_at', 'cv_filename', 'cv_mime']
+    .map((c) => `"${c}"`).join(', ') + ', CASE WHEN cv_data IS NOT NULL THEN 1 ELSE 0 END AS has_cv';
 
 const now = () => new Date().toISOString();
 
@@ -205,17 +215,24 @@ export function listInterns(q) {
     const like = `%${q.trim()}%`;
     return db
       .prepare(
-        `SELECT * FROM interns
+        `SELECT ${internSelectCols} FROM interns
          WHERE full_name LIKE ? OR phone LIKE ? OR email LIKE ?
             OR university LIKE ? OR position_applied LIKE ?
          ORDER BY id DESC`
       )
       .all(like, like, like, like, like);
   }
-  return db.prepare('SELECT * FROM interns ORDER BY id DESC').all();
+  return db.prepare(`SELECT ${internSelectCols} FROM interns ORDER BY id DESC`).all();
 }
 export function getIntern(id) {
-  return db.prepare('SELECT * FROM interns WHERE id = ?').get(id);
+  return db.prepare(`SELECT ${internSelectCols} FROM interns WHERE id = ?`).get(id);
+}
+export function setInternCv(id, filename, mime, buffer) {
+  db.prepare('UPDATE interns SET cv_filename = ?, cv_mime = ?, cv_data = ?, updated_at = ? WHERE id = ?')
+    .run(filename, mime, buffer, now(), id);
+}
+export function getInternCv(id) {
+  return db.prepare('SELECT cv_filename, cv_mime, cv_data FROM interns WHERE id = ?').get(id);
 }
 export function createIntern(data, source = 'admin') {
   const cols = internFieldKeys.filter((k) => data[k] !== undefined);

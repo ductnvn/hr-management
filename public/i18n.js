@@ -149,6 +149,11 @@ const STRINGS = {
     apply_success_msg: 'Cảm ơn bạn đã ứng tuyển. Bộ phận Nhân sự sẽ liên hệ với bạn trong thời gian sớm nhất.',
     apply_another: 'Gửi đơn khác',
     apply_conn_err: 'Không kết nối được máy chủ.',
+    apply_cv_label: 'Đính kèm CV (nếu có)',
+    apply_cv_hint: 'Chấp nhận PDF, DOC, DOCX, ảnh — tối đa 5MB',
+    apply_cv_toobig: 'Tệp quá lớn (tối đa 5MB)',
+    apply_cv_badtype: 'Định dạng không hỗ trợ (chỉ PDF, DOC, DOCX, ảnh)',
+    it_th_cv: 'CV', intern_cv_download: '📎 Tải CV', intern_cv_none: '—',
   },
   en: {
     app_title: 'HR Management',
@@ -284,6 +289,11 @@ const STRINGS = {
     apply_success_msg: 'Thank you for applying. The HR department will contact you soon.',
     apply_another: 'Submit another',
     apply_conn_err: 'Cannot reach the server.',
+    apply_cv_label: 'Attach CV (optional)',
+    apply_cv_hint: 'PDF, DOC, DOCX, image — max 5MB',
+    apply_cv_toobig: 'File too large (max 5MB)',
+    apply_cv_badtype: 'Unsupported format (PDF, DOC, DOCX, image only)',
+    it_th_cv: 'CV', intern_cv_download: '📎 Download CV', intern_cv_none: '—',
   },
 };
 

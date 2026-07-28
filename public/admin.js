@@ -558,6 +558,8 @@ function campaignCard(c) {
   copyBtn.onclick = () => { navigator.clipboard.writeText(url); toast(t('copied'), 'ok'); };
   const openBtn = el('a', { className: 'btn sm', href: url, target: '_blank' }, t('camp_openlink'));
 
+  const editBtn = el('button', { className: 'btn sm' }, t('camp_edit'));
+  editBtn.onclick = () => openCampaignModal(c);
   const toggleBtn = el('button', { className: 'btn sm' }, c.active ? t('camp_lock') : t('camp_reopen'));
   toggleBtn.onclick = async () => { await api('/api/campaigns/' + c.id, { method: 'PATCH', body: JSON.stringify({ active: !c.active }) }); renderCampaigns(); };
   const delBtn = el('button', { className: 'btn sm danger' }, t('camp_del'));
@@ -567,7 +569,7 @@ function campaignCard(c) {
     el('div', { style: 'display:flex;align-items:center;gap:10px;flex-wrap:wrap' },
       el('strong', { style: 'font-size:15px' }, c.title), statusEl,
       el('span', { className: 'meta' }, t('camp_subs', c.submissions)),
-      el('div', { style: 'flex:1' }), toggleBtn, delBtn),
+      el('div', { style: 'flex:1' }), editBtn, toggleBtn, delBtn),
     el('div', { className: 'meta' },
       t('camp_verify_code') + (c.require_dob ? t('camp_verify_dob') : '') + ' ' + (c.expires_at ? t('camp_expires', c.expires_at) : t('camp_noexpire'))),
     chips,
@@ -575,15 +577,16 @@ function campaignCard(c) {
   );
 }
 
-function openCampaignModal() {
+function openCampaignModal(existing) {
+  const isEdit = !!existing;
   const form = el('form', { id: 'campForm' });
   form.append(
     el('label', { className: 'field' }, el('span', {}, t('camp_field_title'), el('span', { className: 'req' }, ' *')),
-      el('input', { name: 'title', required: true, placeholder: t('camp_title_ph') })),
+      el('input', { name: 'title', required: true, placeholder: t('camp_title_ph'), value: existing?.title || '' })),
     el('div', { className: 'grid2', style: 'margin-top:14px' },
-      el('label', { className: 'field' }, el('span', {}, t('camp_expiry')), el('input', { type: 'date', name: 'expires_at' })),
+      el('label', { className: 'field' }, el('span', {}, t('camp_expiry')), el('input', { type: 'date', name: 'expires_at', value: existing?.expires_at || '' })),
       el('label', { className: 'field', style: 'display:flex;align-items:center;gap:8px;margin-top:22px' },
-        el('input', { type: 'checkbox', name: 'require_dob', checked: true, style: 'width:auto' }),
+        el('input', { type: 'checkbox', name: 'require_dob', checked: isEdit ? !!existing.require_dob : true, style: 'width:auto' }),
         el('span', { style: 'margin:0' }, t('camp_require_dob'))),
     ),
     el('div', { style: 'margin-top:18px' },
@@ -592,15 +595,18 @@ function openCampaignModal() {
         (() => { const b = el('button', { type: 'button', className: 'btn sm ghost' }, t('camp_defaults')); b.onclick = selectDefaults; return b; })()),
       buildFieldPicker()),
   );
-  const modal = buildModal(t('campmodal_title'), form, [
+  const modal = buildModal(isEdit ? t('camp_edit_title') : t('campmodal_title'), form, [
     { label: t('cancel'), className: 'btn', onclick: closeModal },
-    { label: t('camp_create_btn'), className: 'btn primary', submit: true },
+    { label: isEdit ? t('save_changes') : t('camp_create_btn'), className: 'btn primary', submit: true },
   ], 'wide');
 
-  function selectDefaults() {
-    for (const cb of form.querySelectorAll('input[data-key]')) cb.checked = !!FIELD_BY_KEY[cb.dataset.key]?.self;
+  function applyChecks(keys) {
+    for (const cb of form.querySelectorAll('input[data-key]')) cb.checked = keys.includes(cb.dataset.key);
   }
-  selectDefaults();
+  function selectDefaults() {
+    applyChecks(SCHEMA.fields.filter((f) => f.self).map((f) => f.key));
+  }
+  if (isEdit) applyChecks(existing.allowed_fields); else selectDefaults();
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -612,11 +618,14 @@ function openCampaignModal() {
       require_dob: form.require_dob.checked,
     };
     try {
-      const c = await api('/api/campaigns', { method: 'POST', body: JSON.stringify(payload) });
-      closeModal();
-      toast(t('camp_created'), 'ok');
-      renderCampaigns();
-      setTimeout(() => { navigator.clipboard?.writeText(location.origin + '/update/' + c.token); }, 100);
+      if (isEdit) {
+        await api('/api/campaigns/' + existing.id, { method: 'PUT', body: JSON.stringify(payload) });
+        closeModal(); toast(t('camp_saved'), 'ok'); renderCampaigns();
+      } else {
+        const c = await api('/api/campaigns', { method: 'POST', body: JSON.stringify(payload) });
+        closeModal(); toast(t('camp_created'), 'ok'); renderCampaigns();
+        setTimeout(() => { navigator.clipboard?.writeText(location.origin + '/update/' + c.token); }, 100);
+      }
     } catch (err) { toast(err.message, 'err'); }
   });
   document.body.append(modal);

@@ -138,6 +138,17 @@ async function handleApi(req, res, url, path) {
   const campMatch = path.match(/^\/api\/campaigns\/(\d+)$/);
   if (campMatch) {
     const id = Number(campMatch[1]);
+    if (method === 'PUT') {
+      const body = await readBody(req);
+      if (!store.getCampaign(id)) return sendJson(res, 404, { error: 'Không tìm thấy' });
+      if (!body.title || !body.title.trim()) return sendJson(res, 400, { error: 'Thiếu tiêu đề' });
+      const allowed = (body.allowed_fields || []).filter((k) => fieldByKey[k]);
+      if (allowed.length === 0) return sendJson(res, 400, { error: 'Chọn ít nhất 1 trường cho phép cập nhật' });
+      return sendJson(res, 200, store.updateCampaign(id, {
+        title: body.title.trim(), allowed_fields: allowed,
+        expires_at: body.expires_at || null, require_dob: body.require_dob !== false,
+      }));
+    }
     if (method === 'PATCH') {
       const body = await readBody(req);
       store.setCampaignActive(id, !!body.active);

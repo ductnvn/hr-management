@@ -163,6 +163,20 @@ export function createCampaign({ title, allowed_fields, expires_at, require_dob 
   return getCampaignByToken(token);
 }
 
+export function getCampaign(id) {
+  const r = db.prepare('SELECT * FROM campaigns WHERE id = ?').get(id);
+  if (!r) return null;
+  return { ...r, allowed_fields: JSON.parse(r.allowed_fields), active: !!r.active, require_dob: !!r.require_dob };
+}
+
+// Sửa chiến dịch hiện có — GIỮ NGUYÊN token (link không đổi).
+export function updateCampaign(id, { title, allowed_fields, expires_at, require_dob }) {
+  db.prepare(
+    'UPDATE campaigns SET title = ?, allowed_fields = ?, expires_at = ?, require_dob = ? WHERE id = ?'
+  ).run(title, JSON.stringify(allowed_fields), expires_at || null, require_dob ? 1 : 0, id);
+  return getCampaign(id);
+}
+
 export function setCampaignActive(id, active) {
   db.prepare('UPDATE campaigns SET active = ? WHERE id = ?').run(active ? 1 : 0, id);
 }

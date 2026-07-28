@@ -19,10 +19,26 @@ const SALARY_TYPES = ['Hourly', 'Salary', 'Salary 1', 'Salary 2', 'Salary 3'];
 const LEVELS = ['Director', 'Manager', 'Supervisor', 'Team Leader', 'Nonmanager', 'Worker'];
 const RECRUIT_TYPES = ['New HC', 'Replacement', 'Seasonal', 'Internship', 'Outsourced'];
 const RECRUIT_SOURCES = [
-  'Giới thiệu nội bộ (nhân viên)', 'Website tuyển dụng (VietnamWorks, TopCV, CareerBuilder…)',
-  'ITviec', 'LinkedIn', 'Facebook / Mạng xã hội', 'Website công ty / Ứng viên tự nộp',
-  'Công ty tuyển dụng / Headhunter', 'Trung tâm giới thiệu việc làm', 'Ngày hội việc làm (Job Fair)',
-  'Trường / Đại học (Campus)', 'Tuyển dụng nội bộ / Điều chuyển', 'Nhân viên cũ quay lại (Rehire)',
+  'Bảng thông tin tuyển dụng ở cổng',
+  'Facebook',
+  'Zalo',
+  'Người quen/bạn bè giới thiệu',
+  'Giới thiệu nội bộ (nhân viên)',
+  'TopCV',
+  'Vietnamworks',
+  'Careerviet/Careerbuilder',
+  'Việc làm 24h',
+  'Careerlink',
+  'ITviec',
+  'LinkedIn',
+  'Headhunter',
+  'Website công ty / Ứng viên tự nộp',
+  'Trung tâm giới thiệu việc làm',
+  'Ngày hội việc làm (Job Fair)',
+  'Trường / Đại học (Campus)',
+  'Tuyển dụng nội bộ / Điều chuyển',
+  'Nhân viên cũ quay lại (Rehire)',
+  'Khác',
 ];
 
 export const groups = [

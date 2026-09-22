@@ -15,6 +15,7 @@ const esc = (s) => (s == null ? '' : String(s));
 let TOKEN = localStorage.getItem('hr_token') || '';
 let SCHEMA = { groups: [], fields: [] };
 let INTERN_SCHEMA = { groups: [], fields: [] };
+let JOBFAIR_SCHEMA = { groups: [], fields: [] };
 let FIELD_BY_KEY = {};
 let CURRENT_VIEW = 'employees';
 
@@ -83,6 +84,7 @@ function render(view) {
   $('#viewTitle').textContent = t('title_' + view);
   if (view === 'employees') return renderEmployees();
   if (view === 'interns') return renderInterns();
+  if (view === 'jobfair') return renderJobfair();
   if (view === 'campaigns') return renderCampaigns();
   if (view === 'history') return renderHistory();
   if (view === 'backup') return renderBackup();
@@ -203,6 +205,9 @@ function fieldInput(f, value = '', full = false) {
     input = el('input', { name: f.key, value: esc(value), list: listId, autocomplete: 'off', placeholder: t('datalist_ph') });
     extra = el('datalist', { id: listId });
     for (const o of f.options) extra.append(el('option', { value: o }));
+  } else if (f.type === 'checkbox') {
+    const truthy = value && !['', '0', 'false', 'Không', 'No'].includes(String(value));
+    input = el('input', { type: 'checkbox', name: f.key, checked: !!truthy, style: 'width:auto' });
   } else {
     input = el('input', { type: f.type === 'number' ? 'number' : f.type, name: f.key, value: esc(value) });
   }
@@ -213,7 +218,7 @@ function fieldInput(f, value = '', full = false) {
 }
 function collectForm(form) {
   const data = {};
-  for (const inp of form.querySelectorAll('[name]')) data[inp.name] = inp.value;
+  for (const inp of form.querySelectorAll('[name]')) data[inp.name] = inp.type === 'checkbox' ? (inp.checked ? 'Có' : '') : inp.value;
   return data;
 }
 
@@ -341,12 +346,109 @@ async function downloadCsv(path, filename) {
   const a = el('a', { href: URL.createObjectURL(blob), download: filename });
   document.body.append(a); a.click(); a.remove();
 }
-async function downloadCv(id, filename) {
-  const res = await fetch('/api/interns/' + id + '/cv', { headers: { Authorization: 'Bearer ' + TOKEN } });
+async function downloadCv(id, filename, base = '/api/interns/') {
+  const res = await fetch(base + id + '/cv', { headers: { Authorization: 'Bearer ' + TOKEN } });
   if (!res.ok) return toast('CV không tồn tại', 'err');
   const blob = await res.blob();
   const a = el('a', { href: URL.createObjectURL(blob), download: filename || 'cv' });
   document.body.append(a); a.click(); a.remove();
+}
+
+// ===========================================================================
+// JOB FAIR
+// ===========================================================================
+async function renderJobfair() {
+  const content = $('#content');
+  const rows = await api('/api/jobfair');
+  const isNew = (s) => (s || '').startsWith('Mới nộp');
+
+  const url = location.origin + '/jobfair';
+  const linkInput = el('input', { value: url, readOnly: true });
+  const copyBtn = el('button', { className: 'btn sm' }, t('camp_copy'));
+  copyBtn.onclick = () => { navigator.clipboard.writeText(url); toast(t('copied'), 'ok'); };
+  const openBtn = el('a', { className: 'btn sm', href: url, target: '_blank' }, t('camp_openlink'));
+  const linkCard = el('div', { className: 'card', style: 'padding:16px 18px;margin-bottom:18px' },
+    el('strong', { style: 'font-size:15px' }, t('jf_link_title')),
+    el('div', { className: 'meta', style: 'margin:4px 0 10px' }, t('jf_link_desc')),
+    el('div', { className: 'link-row' }, linkInput, copyBtn, openBtn));
+
+  const bar = el('div', { className: 'toolbar' });
+  bar.append(
+    el('input', { type: 'search', id: 'jfSearch', placeholder: t('search_ph'), value: '' }),
+    (() => { const b = el('button', { className: 'btn' }, t('export_interns')); b.onclick = () => downloadCsv('/api/jobfair.csv', 'jobfair.csv'); return b; })(),
+    (() => { const b = el('button', { className: 'btn primary' }, t('jf_add')); b.onclick = () => openJobfairModal(); return b; })(),
+  );
+
+  content.replaceChildren(
+    el('div', { className: 'stats' },
+      stat(rows.length, t('jf_stat_total')),
+      stat(rows.filter((i) => isNew(i.status)).length, t('jf_stat_new')),
+    ),
+    linkCard, bar, jobfairTable(rows),
+  );
+  const s = $('#jfSearch');
+  s?.addEventListener('input', debounce(async (ev) => {
+    const r = await api('/api/jobfair' + (ev.target.value ? '?q=' + encodeURIComponent(ev.target.value) : ''));
+    $('#jfTableCard').replaceWith(jobfairTable(r));
+  }, 250));
+}
+
+function jobfairTable(rows) {
+  if (!rows.length)
+    return el('div', { className: 'card', id: 'jfTableCard' }, el('div', { className: 'empty' }, t('jf_empty')));
+  const heads = [t('th_name'), t('th_phone'), 'Email', t('it_th_uni'), t('jf_th_dept'), t('jf_th_year'), t('it_th_cv'), t('th_status'), ''];
+  const thead = el('thead', {}, el('tr', {}, ...heads.map((h) => el('th', {}, h))));
+  const tbody = el('tbody');
+  for (const r of rows) {
+    const cvCell = r.has_cv
+      ? (() => { const a = el('button', { className: 'btn sm ghost', title: r.cv_filename || 'CV' }, t('intern_cv_download')); a.onclick = () => downloadCv(r.id, r.cv_filename, '/api/jobfair/'); return a; })()
+      : el('span', { className: 'meta' }, t('intern_cv_none'));
+    tbody.append(el('tr', {},
+      el('td', {}, avatar(r.full_name), el('strong', {}, r.full_name || '—')),
+      el('td', {}, r.phone || '—'),
+      el('td', {}, r.email || '—'),
+      el('td', {}, r.university || '—'),
+      el('td', {}, r.department_interest || '—'),
+      el('td', {}, r.academic_year || '—'),
+      el('td', {}, cvCell),
+      el('td', {}, internStatusBadge(r.status)),
+      el('td', {}, el('div', { className: 'row-actions' },
+        iconBtn('✏️', t('edit'), () => openJobfairModal(r)),
+        iconBtn('🗑️', t('del'), () => removeJobfair(r)))),
+    ));
+  }
+  return el('div', { className: 'card', id: 'jfTableCard' }, el('div', { className: 'table-wrap' }, el('table', {}, thead, tbody)));
+}
+
+function openJobfairModal(it) {
+  const isEdit = !!it;
+  const form = el('form', { id: 'jfForm' });
+  for (const g of JOBFAIR_SCHEMA.groups) {
+    const grid = el('div', { className: 'grid2' });
+    for (const f of g.fields) grid.append(fieldInput(f, it?.[f.key], f.type === 'textarea' || f.type === 'checkbox'));
+    form.append(el('div', { className: 'form-group' }, el('h3', {}, `${g.icon} ${glabel(g)}`), grid));
+  }
+  const modal = buildModal(isEdit ? t('jf_modal_edit') : t('jf_modal_add'), form, [
+    { label: t('cancel'), className: 'btn', onclick: closeModal },
+    { label: isEdit ? t('save_changes') : t('add_new'), className: 'btn primary', submit: true },
+  ]);
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = collectForm(form);
+    try {
+      if (isEdit) await api('/api/jobfair/' + it.id, { method: 'PUT', body: JSON.stringify(data) });
+      else await api('/api/jobfair', { method: 'POST', body: JSON.stringify(data) });
+      closeModal(); toast(isEdit ? t('toast_saved') : t('jf_added'), 'ok');
+      renderJobfair();
+    } catch (err) { toast(err.message, 'err'); }
+  });
+  document.body.append(modal);
+}
+
+async function removeJobfair(r) {
+  if (!confirm(t('jf_del_confirm', r.full_name))) return;
+  try { await api('/api/jobfair/' + r.id, { method: 'DELETE' }); toast(t('toast_deleted'), 'ok'); renderJobfair(); }
+  catch (err) { toast(err.message, 'err'); }
 }
 
 // ===========================================================================
@@ -735,6 +837,7 @@ async function start() {
   applyStaticI18n();
   SCHEMA = await api('/api/fields');
   INTERN_SCHEMA = await api('/api/intern-fields');
+  JOBFAIR_SCHEMA = await api('/api/jobfair-fields');
   FIELD_BY_KEY = Object.fromEntries(SCHEMA.fields.map((f) => [f.key, f]));
   render('employees');
 }

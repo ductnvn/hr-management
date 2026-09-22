@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname } from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { groups, fields, fieldByKey, fieldKeys, internGroups, internFields, internFieldByKey, internApplyKeys } from './fields.js';
+import { groups, fields, fieldByKey, fieldKeys, internGroups, internFields, internFieldByKey, internApplyKeys, jobfairGroups, jobfairFields, jobfairApplyKeys } from './fields.js';
 import * as store from './db.js';
 import { parseXlsx, parseCsv } from './xlsx.js';
 
@@ -29,6 +29,7 @@ const server = http.createServer(async (req, res) => {
     if (path === '/' || path === '/index.html') return sendFile(res, join(PUBLIC, 'index.html'));
     if (path.startsWith('/update/')) return sendFile(res, join(PUBLIC, 'update.html'));
     if (path === '/apply' || path.startsWith('/apply/')) return sendFile(res, join(PUBLIC, 'apply.html'));
+    if (path === '/jobfair' || path.startsWith('/jobfair/')) return sendFile(res, join(PUBLIC, 'jobfair.html'));
 
     // File tĩnh trong /public
     const safe = join(PUBLIC, path.replace(/^\/+/, ''));
@@ -64,6 +65,28 @@ async function handleApi(req, res, url, path) {
     return sendJson(res, 200, { groups: internGroups, fields: internFields });
   }
 
+  // Schema Job Fair (công khai — form đăng ký cần đọc)
+  if (path === '/api/jobfair-fields' && method === 'GET') {
+    return sendJson(res, 200, { groups: jobfairGroups, fields: jobfairFields });
+  }
+
+  // Ứng viên Job Fair đăng ký (công khai, tạo bản ghi mới)
+  if (path === '/api/public/jobfair-apply' && method === 'POST') {
+    const body = await readBody(req);
+    const values = body.values || {};
+    const data = {};
+    for (const k of jobfairApplyKeys) if (values[k] !== undefined) data[k] = String(values[k]);
+    for (const f of jobfairFields) {
+      if (f.required && f.apply && (!data[f.key] || !data[f.key].trim()))
+        return sendJson(res, 400, { error: `Thiếu thông tin bắt buộc: ${f.label}` });
+    }
+    data.status = 'Mới nộp (New)';
+    const rec = store.createJobfair(data, 'public');
+    const cvErr = saveCv(store.setJobfairCv, rec.id, body.cv);
+    if (cvErr) return sendJson(res, 201, { ok: true, cvWarning: cvErr });
+    return sendJson(res, 201, { ok: true });
+  }
+
   // Ứng viên thực tập nộp đơn (công khai, tạo bản ghi mới)
   if (path === '/api/public/intern-apply' && method === 'POST') {
     const body = await readBody(req);
@@ -77,7 +100,7 @@ async function handleApi(req, res, url, path) {
     data.status = 'Mới nộp (New)';
     const intern = store.createIntern(data, 'public');
     // Đính kèm CV (tùy chọn)
-    const cvErr = saveCv(intern.id, body.cv);
+    const cvErr = saveCv(store.setInternCv, intern.id, body.cv);
     if (cvErr) return sendJson(res, 201, { ok: true, cvWarning: cvErr });
     return sendJson(res, 201, { ok: true });
   }
@@ -207,16 +230,35 @@ async function handleApi(req, res, url, path) {
   }
   // Tải CV của thực tập sinh
   const cvMatch = path.match(/^\/api\/interns\/(\d+)\/cv$/);
-  if (cvMatch && method === 'GET') {
-    const cv = store.getInternCv(Number(cvMatch[1]));
-    if (!cv || !cv.cv_data) return sendJson(res, 404, { error: 'Không có CV' });
-    const name = cv.cv_filename || 'cv';
-    res.writeHead(200, {
-      'Content-Type': cv.cv_mime || 'application/octet-stream',
-      'Content-Disposition': `attachment; filename="cv"; filename*=UTF-8''${encodeURIComponent(name)}`,
-    });
-    return res.end(Buffer.from(cv.cv_data));
+  if (cvMatch && method === 'GET') return sendCv(res, store.getInternCv(Number(cvMatch[1])));
+
+  // Job Fair (admin)
+  if (path === '/api/jobfair' && method === 'GET')
+    return sendJson(res, 200, store.listJobfair(url.searchParams.get('q')));
+  if (path === '/api/jobfair' && method === 'POST') {
+    const body = await readBody(req);
+    const err = validateJobfair(body);
+    if (err) return sendJson(res, 400, { error: err });
+    return sendJson(res, 201, store.createJobfair(body, 'admin'));
   }
+  if (path === '/api/jobfair.csv' && method === 'GET') return exportJobfairCsv(res);
+  const jfMatch = path.match(/^\/api\/jobfair\/(\d+)$/);
+  if (jfMatch) {
+    const id = Number(jfMatch[1]);
+    if (method === 'GET') {
+      const it = store.getJobfair(id);
+      return it ? sendJson(res, 200, it) : sendJson(res, 404, { error: 'Không tìm thấy' });
+    }
+    if (method === 'PUT') {
+      const body = await readBody(req);
+      const err = validateJobfair(body);
+      if (err) return sendJson(res, 400, { error: err });
+      return sendJson(res, 200, store.updateJobfair(id, body));
+    }
+    if (method === 'DELETE') return sendJson(res, 200, { ok: store.deleteJobfair(id) });
+  }
+  const jfCvMatch = path.match(/^\/api\/jobfair\/(\d+)\/cv$/);
+  if (jfCvMatch && method === 'GET') return sendCv(res, store.getJobfairCv(Number(jfCvMatch[1])));
 
   // Nhập từ Excel/CSV: bước 1 — phân tích tệp thành lưới dữ liệu
   if (path === '/api/import/parse' && method === 'POST') {
@@ -329,18 +371,36 @@ function validateIntern(body) {
   }
   return null;
 }
+function validateJobfair(body) {
+  for (const f of jobfairFields) {
+    if (f.required && (!body[f.key] || !String(body[f.key]).trim()))
+      return `Thiếu trường bắt buộc: ${f.label}`;
+  }
+  return null;
+}
+// Gửi (stream) một CV về trình duyệt.
+function sendCv(res, cv) {
+  if (!cv || !cv.cv_data) return sendJson(res, 404, { error: 'Không có CV' });
+  const name = cv.cv_filename || 'cv';
+  res.writeHead(200, {
+    'Content-Type': cv.cv_mime || 'application/octet-stream',
+    'Content-Disposition': `attachment; filename="cv"; filename*=UTF-8''${encodeURIComponent(name)}`,
+  });
+  return res.end(Buffer.from(cv.cv_data));
+}
 
 const CV_MAX = 5 * 1024 * 1024; // 5MB
 const CV_EXT = ['.pdf', '.doc', '.docx', '.png', '.jpg', '.jpeg'];
 // Lưu CV nếu hợp lệ; trả về chuỗi lỗi (cảnh báo) nếu bỏ qua, null nếu OK/không có.
-function saveCv(internId, cv) {
+// setCvFn(id, filename, mime, buffer) — hàm ghi CV cho bảng tương ứng.
+function saveCv(setCvFn, id, cv) {
   if (!cv || !cv.dataBase64) return null;
   const name = (cv.filename || 'cv').slice(0, 200);
   const ext = (name.match(/\.[^.]+$/) || [''])[0].toLowerCase();
   if (!CV_EXT.includes(ext)) return 'Định dạng CV không hỗ trợ';
   const buf = Buffer.from(cv.dataBase64, 'base64');
   if (buf.length === 0 || buf.length > CV_MAX) return 'CV vượt quá 5MB';
-  store.setInternCv(internId, name, cv.mime || 'application/octet-stream', buf);
+  setCvFn(id, name, cv.mime || 'application/octet-stream', buf);
   return null;
 }
 
@@ -377,6 +437,24 @@ function exportInternsCsv(res) {
   res.writeHead(200, {
     'Content-Type': 'text/csv; charset=utf-8',
     'Content-Disposition': 'attachment; filename="thuc-tap-sinh.csv"',
+  });
+  res.end(csv);
+}
+
+function exportJobfairCsv(res) {
+  const rows = store.listJobfair();
+  const cols = ['id', ...jobfairFields.map((f) => f.key), 'created_at'];
+  const header = ['ID', ...jobfairFields.map((f) => f.label), 'Ngày đăng ký'];
+  const esc = (v) => {
+    const s = v == null ? '' : String(v);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const lines = [header.map(esc).join(',')];
+  for (const r of rows) lines.push(cols.map((c) => esc(r[c])).join(','));
+  const csv = '﻿' + lines.join('\r\n');
+  res.writeHead(200, {
+    'Content-Type': 'text/csv; charset=utf-8',
+    'Content-Disposition': 'attachment; filename="jobfair.csv"',
   });
   res.end(csv);
 }

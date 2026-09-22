@@ -175,3 +175,51 @@ export const internFields = internGroups.flatMap((g) => g.fields);
 export const internFieldByKey = Object.fromEntries(internFields.map((f) => [f.key, f]));
 export const internFieldKeys = internFields.map((f) => f.key);
 export const internApplyKeys = internFields.filter((f) => f.apply).map((f) => f.key);
+
+// ===========================================================================
+// SCHEMA THAM DỰ JOB FAIR (đăng ký ngày hội việc làm)
+// `apply: true` = trường hiển thị trên form đăng ký công khai.
+// ===========================================================================
+const JF_YEARS = ['1st Year / Năm 1', '2nd Year / Năm 2', '3rd Year / Năm 3', 'Final Year / Năm cuối', 'Fresh Graduate / Sinh viên mới tốt nghiệp'];
+const JF_DEPARTMENTS = [
+  'CNC / Gia công CNC',
+  'QA & QC / Đảm bảo & Kiểm soát Chất lượng',
+  'Engineering (Mechanical / Electrical) / Kỹ thuật (Cơ khí / Điện)',
+  'Production / Sản xuất',
+  'Supply Chain / Chuỗi cung ứng',
+  'Purchasing / Thu mua',
+  'HR / Nhân sự',
+  'Finance & Accounting / Tài chính & Kế toán',
+  'IT / Công nghệ Thông tin (CNTT)',
+  'Khác',
+];
+const JF_STATUS = ['Mới nộp (New)', 'Đang xem xét (Reviewing)', 'Đã liên hệ (Contacted)', 'Nhận (Accepted)', 'Từ chối (Rejected)'];
+
+export const jobfairGroups = [
+  {
+    title: 'Thông tin ứng viên', title_en: 'Applicant Information', icon: '🎪',
+    fields: [
+      { key: 'full_name', label: 'Họ và tên', label_en: 'Full Name', type: 'text', required: true, apply: true },
+      { key: 'phone', label: 'Số điện thoại', label_en: 'Phone Number', type: 'tel', required: true, apply: true },
+      { key: 'email', label: 'Địa chỉ email', label_en: 'Email Address', type: 'email', required: true, apply: true },
+      { key: 'university', label: 'Tên Trường Đại học / Cao đẳng', label_en: 'University / College Name', type: 'datalist', options: schools, required: true, apply: true },
+      { key: 'major', label: 'Chuyên ngành', label_en: 'Major', type: 'datalist', options: majors, required: true, apply: true },
+      { key: 'academic_year', label: 'Năm học hiện tại', label_en: 'Current Academic Year', type: 'select', options: JF_YEARS, required: true, apply: true },
+      { key: 'internship_period', label: 'Thời gian thực tập năm 2027 (tháng dự kiến)', label_en: 'Internship period in 2027 (expected months)', type: 'text', required: true, apply: true },
+      { key: 'department_interest', label: 'Bạn quan tâm đến bộ phận nào?', label_en: 'Which department are you interested in?', type: 'select', options: JF_DEPARTMENTS, required: true, apply: true },
+      { key: 'consent', label: 'Tôi đồng ý để Therm-X Vietnam lưu trữ thông tin của tôi nhằm phục vụ các cơ hội tuyển dụng trong tương lai.', label_en: 'I agree that Therm-X Vietnam may retain my information for future recruitment opportunities.', type: 'checkbox', required: true, apply: true },
+    ],
+  },
+  {
+    title: 'Theo dõi (nội bộ)', title_en: 'Tracking (internal)', icon: '🗂️',
+    fields: [
+      { key: 'status', label: 'Trạng thái', label_en: 'Status', type: 'select', options: JF_STATUS },
+      { key: 'notes', label: 'Ghi chú', label_en: 'Notes', type: 'textarea' },
+    ],
+  },
+];
+
+export const jobfairFields = jobfairGroups.flatMap((g) => g.fields);
+export const jobfairFieldByKey = Object.fromEntries(jobfairFields.map((f) => [f.key, f]));
+export const jobfairFieldKeys = jobfairFields.map((f) => f.key);
+export const jobfairApplyKeys = jobfairFields.filter((f) => f.apply).map((f) => f.key);

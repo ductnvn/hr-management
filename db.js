@@ -3,7 +3,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { randomBytes } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { fieldKeys, internFieldKeys } from './fields.js';
+import { fieldKeys, internFieldKeys, jobfairFieldKeys } from './fields.js';
 
 // Đường dẫn DB có thể trỏ vào Volume bền (vd HR_DB=/data/hr.db trên Railway/Render).
 // Tự tạo thư mục chứa nếu chưa có, tránh lỗi khi mount volume ở thư mục mới.
@@ -80,6 +80,29 @@ for (const col of ['cv_filename TEXT', 'cv_mime TEXT', 'cv_data BLOB']) {
 // Cột trả về cho client (KHÔNG kèm cv_data để tránh gửi binary lớn; thay bằng cờ has_cv).
 const internSelectCols =
   ['id', ...internFieldKeys, 'source', 'created_at', 'updated_at', 'cv_filename', 'cv_mime']
+    .map((c) => `"${c}"`).join(', ') + ', CASE WHEN cv_data IS NOT NULL THEN 1 ELSE 0 END AS has_cv';
+
+// --- Bảng đăng ký Job Fair --------------------------------------------------
+const jobfairColumns = jobfairFieldKeys.map((k) => `  "${k}" TEXT`).join(',\n');
+db.exec(`
+CREATE TABLE IF NOT EXISTS jobfair (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+${jobfairColumns},
+  source TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+`);
+const jobfairExisting = new Set(db.prepare('PRAGMA table_info(jobfair)').all().map((c) => c.name));
+for (const k of jobfairFieldKeys) {
+  if (!jobfairExisting.has(k)) db.exec(`ALTER TABLE jobfair ADD COLUMN "${k}" TEXT`);
+}
+for (const col of ['cv_filename TEXT', 'cv_mime TEXT', 'cv_data BLOB']) {
+  const name = col.split(' ')[0];
+  if (!jobfairExisting.has(name)) db.exec(`ALTER TABLE jobfair ADD COLUMN ${col}`);
+}
+const jobfairSelectCols =
+  ['id', ...jobfairFieldKeys, 'source', 'created_at', 'updated_at', 'cv_filename', 'cv_mime']
     .map((c) => `"${c}"`).join(', ') + ', CASE WHEN cv_data IS NOT NULL THEN 1 ELSE 0 END AS has_cv';
 
 const now = () => new Date().toISOString();
@@ -281,8 +304,56 @@ export function countInterns() {
   return db.prepare('SELECT COUNT(*) AS c FROM interns').get().c;
 }
 
+// --- Đăng ký Job Fair -------------------------------------------------------
+export function listJobfair(q) {
+  if (q && q.trim()) {
+    const like = `%${q.trim()}%`;
+    return db
+      .prepare(
+        `SELECT ${jobfairSelectCols} FROM jobfair
+         WHERE full_name LIKE ? OR phone LIKE ? OR email LIKE ?
+            OR university LIKE ? OR department_interest LIKE ?
+         ORDER BY id DESC`
+      )
+      .all(like, like, like, like, like);
+  }
+  return db.prepare(`SELECT ${jobfairSelectCols} FROM jobfair ORDER BY id DESC`).all();
+}
+export function getJobfair(id) {
+  return db.prepare(`SELECT ${jobfairSelectCols} FROM jobfair WHERE id = ?`).get(id);
+}
+export function setJobfairCv(id, filename, mime, buffer) {
+  db.prepare('UPDATE jobfair SET cv_filename = ?, cv_mime = ?, cv_data = ?, updated_at = ? WHERE id = ?')
+    .run(filename, mime, buffer, now(), id);
+}
+export function getJobfairCv(id) {
+  return db.prepare('SELECT cv_filename, cv_mime, cv_data FROM jobfair WHERE id = ?').get(id);
+}
+export function createJobfair(data, source = 'admin') {
+  const cols = jobfairFieldKeys.filter((k) => data[k] !== undefined);
+  const ts = now();
+  const allCols = [...cols, 'source', 'created_at', 'updated_at'];
+  const placeholders = allCols.map(() => '?').join(', ');
+  const values = [...cols.map((k) => nz(data[k])), source, ts, ts];
+  const info = db
+    .prepare(`INSERT INTO jobfair (${allCols.map((c) => `"${c}"`).join(', ')}) VALUES (${placeholders})`)
+    .run(...values);
+  return getJobfair(info.lastInsertRowid);
+}
+export function updateJobfair(id, data) {
+  const cols = jobfairFieldKeys.filter((k) => data[k] !== undefined);
+  if (cols.length === 0) return getJobfair(id);
+  const set = [...cols.map((k) => `"${k}" = ?`), 'updated_at = ?'].join(', ');
+  const values = [...cols.map((k) => nz(data[k])), now(), id];
+  db.prepare(`UPDATE jobfair SET ${set} WHERE id = ?`).run(...values);
+  return getJobfair(id);
+}
+export function deleteJobfair(id) {
+  return db.prepare('DELETE FROM jobfair WHERE id = ?').run(id).changes > 0;
+}
+
 // --- Sao lưu / Khôi phục toàn bộ dữ liệu ------------------------------------
-const BACKUP_TABLES = ['employees', 'interns', 'campaigns', 'self_updates'];
+const BACKUP_TABLES = ['employees', 'interns', 'jobfair', 'campaigns', 'self_updates'];
 function tableColumns(name) {
   return db.prepare(`PRAGMA table_info(${name})`).all().map((c) => c.name);
 }

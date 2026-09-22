@@ -37,11 +37,14 @@ async function load() {
 }
 
 function introBlock() {
-  return el('div', { className: 'intro' },
-    el('h3', {}, t('apply_intro_title')),
-    el('p', { className: 'welcome' }, t('apply_intro_welcome')),
-    el('p', {}, t('apply_intro_body')),
+  const box = el('div', { className: 'intro' },
+    el('h3', {}, t('jf_intro_title')),
+    el('p', { className: 'welcome' }, t('jf_intro_headline')),
   );
+  const body = t('jf_intro_body');
+  for (const line of (Array.isArray(body) ? body : [body])) box.append(el('p', {}, line));
+  box.append(el('p', { className: 'tagline' }, t('jf_intro_tagline')));
+  return box;
 }
 
 function showForm() {
@@ -69,6 +72,12 @@ function showForm() {
       if (!inp.name.startsWith('f_')) continue;
       values[inp.name.slice(2)] = inp.type === 'checkbox' ? (inp.checked ? 'Có' : '') : inp.value;
     }
+    // Trường chọn nhiều (multiselect) → gộp các lựa chọn đã tick.
+    for (const block of form.querySelectorAll('[data-ms]')) {
+      values[block.dataset.ms] = [...block.querySelectorAll('input:checked')].map((c) => c.value).join('; ');
+    }
+    // Kiểm tra multiselect bắt buộc.
+    for (const f of FIELDS) if (f.type === 'multiselect' && f.required && !values[f.key]) { err.textContent = t('jf_multi_required'); return; }
 
     let cv = null;
     const file = cvInput.files[0];
@@ -108,12 +117,17 @@ function showSuccess() {
   ));
 }
 
-// Một dòng field. Checkbox (đồng ý) hiển thị dạng đặc biệt.
+// Một dòng field. Checkbox (đồng ý) và multiselect hiển thị dạng đặc biệt.
 function fieldRow(f) {
   if (f.type === 'checkbox') {
     const input = el('input', { type: 'checkbox', name: 'f_' + f.key });
     if (f.required) input.required = true;
     return el('label', { className: 'consent' }, input, el('span', {}, flabel(f), f.required ? ' *' : ''));
+  }
+  if (f.type === 'multiselect') {
+    const block = el('div', { 'data-ms': f.key, className: 'ms-group' });
+    for (const o of f.options) block.append(el('label', { className: 'ms-opt' }, el('input', { type: 'checkbox', value: o }), el('span', {}, o)));
+    return el('label', { className: 'field' }, el('span', {}, flabel(f), f.required ? el('span', { style: 'color:var(--danger)' }, ' *') : ''), block);
   }
   return el('label', { className: 'field' }, el('span', {}, flabel(f), f.required ? el('span', { style: 'color:var(--danger)' }, ' *') : ''), fieldControl(f));
 }

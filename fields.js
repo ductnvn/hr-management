@@ -180,7 +180,7 @@ export const internApplyKeys = internFields.filter((f) => f.apply).map((f) => f.
 // SCHEMA THAM DỰ JOB FAIR (đăng ký ngày hội việc làm)
 // `apply: true` = trường hiển thị trên form đăng ký công khai.
 // ===========================================================================
-const JF_YEARS = ['1st Year / Năm 1', '2nd Year / Năm 2', '3rd Year / Năm 3', 'Final Year / Năm cuối', 'Fresh Graduate / Sinh viên mới tốt nghiệp'];
+const JF_YEARS = ['1st Year / Năm 1', '2nd Year / Năm 2', '3rd Year / Năm 3', 'Final Year / Năm cuối', 'Fresh Graduate / Sinh viên mới tốt nghiệp', 'Other / Khác'];
 const JF_DEPARTMENTS = [
   'CNC / Gia công CNC',
   'QA & QC / Đảm bảo & Kiểm soát Chất lượng',
@@ -206,7 +206,7 @@ export const jobfairGroups = [
       { key: 'major', label: 'Chuyên ngành', label_en: 'Major', type: 'datalist', options: majors, required: true, apply: true },
       { key: 'academic_year', label: 'Năm học hiện tại', label_en: 'Current Academic Year', type: 'select', options: JF_YEARS, required: true, apply: true },
       { key: 'internship_period', label: 'Thời gian thực tập năm 2027 (tháng dự kiến)', label_en: 'Internship period in 2027 (expected months)', type: 'text', required: true, apply: true },
-      { key: 'department_interest', label: 'Bạn quan tâm đến bộ phận nào?', label_en: 'Which department are you interested in?', type: 'select', options: JF_DEPARTMENTS, required: true, apply: true },
+      { key: 'department_interest', label: 'Bạn quan tâm đến bộ phận nào? (có thể chọn nhiều)', label_en: 'Which department are you interested in? (choose one or more)', type: 'multiselect', options: JF_DEPARTMENTS, required: true, apply: true },
       { key: 'consent', label: 'Tôi đồng ý để Therm-X Vietnam lưu trữ thông tin của tôi nhằm phục vụ các cơ hội tuyển dụng trong tương lai.', label_en: 'I agree that Therm-X Vietnam may retain my information for future recruitment opportunities.', type: 'checkbox', required: true, apply: true },
     ],
   },

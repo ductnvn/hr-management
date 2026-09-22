@@ -208,6 +208,12 @@ function fieldInput(f, value = '', full = false) {
   } else if (f.type === 'checkbox') {
     const truthy = value && !['', '0', 'false', 'Không', 'No'].includes(String(value));
     input = el('input', { type: 'checkbox', name: f.key, checked: !!truthy, style: 'width:auto' });
+  } else if (f.type === 'multiselect') {
+    const selected = value ? String(value).split('; ') : [];
+    const block = el('div', { 'data-ms': f.key, className: 'ms-group' });
+    for (const o of f.options) block.append(el('label', { className: 'ms-opt' }, el('input', { type: 'checkbox', value: o, checked: selected.includes(o) }), el('span', {}, o)));
+    label.append(block);
+    return label;
   } else {
     input = el('input', { type: f.type === 'number' ? 'number' : f.type, name: f.key, value: esc(value) });
   }
@@ -219,6 +225,7 @@ function fieldInput(f, value = '', full = false) {
 function collectForm(form) {
   const data = {};
   for (const inp of form.querySelectorAll('[name]')) data[inp.name] = inp.type === 'checkbox' ? (inp.checked ? 'Có' : '') : inp.value;
+  for (const block of form.querySelectorAll('[data-ms]')) data[block.dataset.ms] = [...block.querySelectorAll('input:checked')].map((c) => c.value).join('; ');
   return data;
 }
 
@@ -425,7 +432,7 @@ function openJobfairModal(it) {
   const form = el('form', { id: 'jfForm' });
   for (const g of JOBFAIR_SCHEMA.groups) {
     const grid = el('div', { className: 'grid2' });
-    for (const f of g.fields) grid.append(fieldInput(f, it?.[f.key], f.type === 'textarea' || f.type === 'checkbox'));
+    for (const f of g.fields) grid.append(fieldInput(f, it?.[f.key], f.type === 'textarea' || f.type === 'checkbox' || f.type === 'multiselect'));
     form.append(el('div', { className: 'form-group' }, el('h3', {}, `${g.icon} ${glabel(g)}`), grid));
   }
   const modal = buildModal(isEdit ? t('jf_modal_edit') : t('jf_modal_add'), form, [
